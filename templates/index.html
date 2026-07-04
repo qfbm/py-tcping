@@ -1,0 +1,765 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TCPING Monitor</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/zh.js"></script>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --panel-2: #f8fafc;
+      --line: #d9e2ec;
+      --text: #1f2a37;
+      --muted: #667085;
+      --green: #22c55e;
+      --red: #ff4d4f;
+      --blue: #2563eb;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+      letter-spacing: 0;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    aside {
+      border-right: 1px solid var(--line);
+      background: #ffffff;
+      padding: 22px;
+    }
+
+    main {
+      padding: 24px;
+      min-width: 0;
+    }
+
+    .dashboard-heading {
+      min-width: 0;
+    }
+
+    .dashboard-title {
+      margin: 0 0 4px;
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .dashboard-subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 22px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 12px rgba(63, 203, 128, 0.8);
+    }
+
+    .logout-btn {
+      width: 100%;
+      height: 36px;
+      margin-bottom: 16px;
+      border: 1px solid var(--line);
+      background: #ffffff;
+      color: var(--muted);
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .panel-title {
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    label {
+      display: block;
+      margin: 0 0 6px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    input {
+      width: 100%;
+      height: 38px;
+      margin-bottom: 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      background: #ffffff;
+      color: var(--text);
+      padding: 0 10px;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: var(--blue);
+    }
+
+    button {
+      border: 0;
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .add-btn {
+      width: 100%;
+      height: 40px;
+      background: var(--blue);
+    }
+
+    .delete-btn {
+      flex: 0 0 auto;
+      height: 30px;
+      padding: 0 10px;
+      background: var(--red);
+      font-size: 12px;
+    }
+
+    .node-actions {
+      display: flex;
+      flex: 0 0 auto;
+      gap: 6px;
+    }
+
+    .move-btn {
+      width: 30px;
+      height: 30px;
+      border: 1px solid var(--line);
+      background: #ffffff;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .move-btn:disabled {
+      color: #cbd5e1;
+      cursor: not-allowed;
+    }
+
+    .filter-bar {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 18px;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    .filter-controls {
+      display: flex;
+      align-items: flex-end;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-left: auto;
+    }
+
+    .filter-field {
+      min-width: 180px;
+    }
+
+    .filter-field input {
+      margin-bottom: 0;
+    }
+
+    .flatpickr-calendar {
+      border: 1px solid var(--line);
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
+    }
+
+    .query-btn {
+      height: 38px;
+      min-width: 86px;
+      padding: 0 16px;
+      background: var(--blue);
+    }
+
+    .filter-text {
+      display: none;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: right;
+    }
+
+    .node-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .node-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+
+    .node-meta {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .node-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .node-host {
+      margin-top: 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .chart-card {
+      min-height: 360px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      overflow: hidden;
+    }
+
+    .chart-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      height: 54px;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-2);
+    }
+
+    .chart-title {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 700;
+    }
+
+    .chart-subtitle {
+      flex: 0 0 auto;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .chart {
+      width: 100%;
+      height: 304px;
+    }
+
+    .empty {
+      padding: 48px 20px;
+      border: 1px dashed #cbd5e1;
+      border-radius: 8px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      max-width: 360px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+      color: var(--text);
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
+      display: none;
+    }
+
+    @media (max-width: 860px) {
+      body {
+        overflow-x: hidden;
+      }
+
+      .app {
+        grid-template-columns: 1fr;
+        width: 100%;
+        max-width: 100vw;
+      }
+
+      main {
+        order: 1;
+        width: 100%;
+        max-width: 100vw;
+      }
+
+      aside {
+        order: 2;
+        width: 100%;
+        max-width: 100vw;
+        border-right: 0;
+        border-top: 1px solid var(--line);
+        padding: 16px;
+      }
+
+      main {
+        padding: 16px;
+      }
+
+      .filter-bar {
+        align-items: stretch;
+        flex-direction: column;
+        width: 100%;
+        max-width: 100%;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .filter-controls {
+        align-items: stretch;
+        flex-direction: column;
+        width: 100%;
+        margin-left: 0;
+      }
+
+      .filter-field {
+        min-width: 0;
+        width: 100%;
+      }
+
+      .query-btn {
+        width: 100%;
+      }
+
+      .filter-text {
+        text-align: left;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+        width: 100%;
+      }
+
+      .chart-card,
+      .panel {
+        width: 100%;
+        max-width: 100%;
+        margin-left: auto;
+        margin-right: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <div class="brand">
+        <h1>TCPING Monitor</h1>
+        <span class="status-dot"></span>
+      </div>
+
+      <form method="post" action="/logout">
+        <button class="logout-btn" type="submit">退出登录</button>
+      </form>
+
+      <section class="panel">
+        <h2 class="panel-title">增加监控节点</h2>
+        <form id="addForm">
+          <label for="nodeName">节点名称</label>
+          <input id="nodeName" name="name" placeholder="AliyunHK" autocomplete="off" required>
+
+          <label for="nodeHost">IP/域名</label>
+          <input id="nodeHost" name="host" placeholder="example.com" autocomplete="off" required>
+
+          <label for="nodePort">端口</label>
+          <input id="nodePort" name="port" type="number" min="1" max="65535" placeholder="443" required>
+
+          <button class="add-btn" type="submit">添加</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel-title">当前节点</h2>
+        <div id="nodeList" class="node-list"></div>
+      </section>
+    </aside>
+
+    <main>
+      <section class="filter-bar">
+        <div class="dashboard-heading">
+          <h2 class="dashboard-title">监控图表</h2>
+        </div>
+        <div class="filter-controls">
+          <div class="filter-field">
+            <label for="startDate">开始日期</label>
+            <input id="startDate" type="text" placeholder="选择开始日期" readonly>
+          </div>
+          <div class="filter-field">
+            <label for="endDate">结束日期</label>
+            <input id="endDate" type="text" placeholder="选择结束日期" readonly>
+          </div>
+          <button id="queryBtn" class="query-btn" type="button">查询</button>
+        </div>
+        <div id="filterText" class="filter-text"></div>
+      </section>
+      <div id="charts" class="grid"></div>
+    </main>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const charts = new Map();
+    const chartRoot = document.getElementById('charts');
+    const nodeList = document.getElementById('nodeList');
+    const toast = document.getElementById('toast');
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    const queryBtn = document.getElementById('queryBtn');
+    const filterText = document.getElementById('filterText');
+
+    function localDateString(date = new Date()) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    startDateInput.value = localDateString();
+    endDateInput.value = localDateString();
+    let appliedStartDate = startDateInput.value;
+    let appliedEndDate = endDateInput.value;
+    let isRangeQueryApplied = false;
+
+    flatpickr(startDateInput, {
+      locale: flatpickr.l10ns.zh,
+      dateFormat: 'Y-m-d',
+      allowInput: false,
+      defaultDate: appliedStartDate,
+      disableMobile: true
+    });
+
+    flatpickr(endDateInput, {
+      locale: flatpickr.l10ns.zh,
+      dateFormat: 'Y-m-d',
+      allowInput: false,
+      defaultDate: appliedEndDate,
+      disableMobile: true
+    });
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.style.display = 'block';
+      window.clearTimeout(showToast.timer);
+      showToast.timer = window.setTimeout(() => {
+        toast.style.display = 'none';
+      }, 2600);
+    }
+
+    async function requestJSON(url, options = {}) {
+      const response = await fetch(url, options);
+      const data = await response.json();
+      if (!response.ok || data.ok === false) {
+        throw new Error(data.error || '请求失败');
+      }
+      return data;
+    }
+
+    function renderNodeList(nodes) {
+      nodeList.innerHTML = '';
+      if (!nodes.length) {
+        nodeList.innerHTML = '<div class="empty">暂无节点</div>';
+        return;
+      }
+
+      nodes.forEach((node, index) => {
+        const row = document.createElement('div');
+        row.className = 'node-row';
+        row.innerHTML = `
+          <div class="node-meta">
+            <div class="node-name"></div>
+            <div class="node-host"></div>
+          </div>
+          <div class="node-actions">
+            <button class="move-btn move-up" type="button" title="上移">↑</button>
+            <button class="move-btn move-down" type="button" title="下移">↓</button>
+            <button class="delete-btn" type="button">删除</button>
+          </div>
+        `;
+        row.querySelector('.node-name').textContent = node.name;
+        row.querySelector('.node-host').textContent = `${node.host}:${node.port} / ${node.interval}s`;
+        row.querySelector('.move-up').disabled = index === 0;
+        row.querySelector('.move-down').disabled = index === nodes.length - 1;
+        row.querySelector('.move-up').addEventListener('click', () => moveNode(node.id, 'up'));
+        row.querySelector('.move-down').addEventListener('click', () => moveNode(node.id, 'down'));
+        row.querySelector('.delete-btn').addEventListener('click', () => deleteNode(node.id));
+        nodeList.appendChild(row);
+      });
+    }
+
+    function chartOption(node, data) {
+      const maxXAxisLabels = 8;
+      const xAxisLabelStep = Math.max(1, Math.ceil(data.timestamps.length / maxXAxisLabels) + 1);
+
+      return {
+        backgroundColor: 'transparent',
+        tooltip: {
+          trigger: 'axis',
+          backgroundColor: '#ffffff',
+          borderColor: '#d9e2ec',
+          textStyle: { color: '#1f2a37' }
+        },
+        legend: {
+          show: false
+        },
+        grid: {
+          top: 42,
+          left: 54,
+          right: 58,
+          bottom: 42
+        },
+        xAxis: {
+          type: 'category',
+          boundaryGap: false,
+          data: data.timestamps,
+          axisLine: { lineStyle: { color: '#cbd5e1' } },
+          axisLabel: {
+            color: '#1f2a37',
+            hideOverlap: true,
+            interval: index => index % xAxisLabelStep === 0,
+            formatter: value => value
+          },
+          splitLine: { show: false }
+        },
+        yAxis: [
+          {
+            type: 'value',
+            name: '延迟(ms)',
+            min: 0,
+            nameTextStyle: { color: '#1f2a37' },
+            axisLabel: {
+              color: '#1f2a37',
+              formatter: value => value === 0 ? '' : value
+            },
+            axisLine: { show: true, lineStyle: { color: '#1f2a37' } },
+            splitLine: { lineStyle: { color: '#e5e7eb' } }
+          },
+          {
+            type: 'value',
+            name: '丢包率(%)',
+            min: 0,
+            max: 100,
+            nameTextStyle: { color: '#1f2a37' },
+            axisLabel: {
+              color: '#1f2a37',
+              formatter: value => value === 0 ? '' : `${value}%`
+            },
+            axisLine: { show: true, lineStyle: { color: '#1f2a37' } },
+            splitLine: { show: false }
+          }
+        ],
+        series: [
+          {
+            name: '延迟',
+            data: data.avgDelay,
+            type: 'line',
+            smooth: true,
+            showSymbol: false,
+            yAxisIndex: 0,
+            z: 1,
+            lineStyle: { width: 2, color: '#22c55e' },
+            itemStyle: { color: '#22c55e' },
+            areaStyle: { color: 'rgba(34, 197, 94, 0.18)' }
+          },
+          {
+            name: '丢包率',
+            data: data.lossPk,
+            type: 'line',
+            smooth: true,
+            showSymbol: false,
+            yAxisIndex: 1,
+            z: 2,
+            lineStyle: { width: 2, color: '#ff4d4f' },
+            itemStyle: { color: '#ff4d4f' },
+            areaStyle: { color: 'rgba(255, 77, 79, 0.2)' }
+          }
+        ]
+      };
+    }
+
+    async function renderCharts(nodes) {
+      chartRoot.innerHTML = '';
+      charts.forEach(chart => chart.dispose());
+      charts.clear();
+
+      if (!nodes.length) {
+        chartRoot.innerHTML = '<div class="empty">添加一个节点后，图表会在下一分钟聚合写入后显示数据。</div>';
+        return;
+      }
+
+      for (const node of nodes) {
+        const card = document.createElement('section');
+        card.className = 'chart-card';
+        card.innerHTML = `
+          <div class="chart-head">
+            <div class="chart-title"></div>
+            <div class="chart-subtitle"></div>
+          </div>
+          <div class="chart"></div>
+        `;
+        card.querySelector('.chart-title').textContent = node.name;
+        card.querySelector('.chart-subtitle').textContent = `${node.host}:${node.port}`;
+        chartRoot.appendChild(card);
+
+        const chartEl = card.querySelector('.chart');
+        const chart = echarts.init(chartEl);
+        charts.set(node.id, chart);
+
+        try {
+          const params = new URLSearchParams({ node_id: node.id });
+          if (isRangeQueryApplied) {
+            params.set('start_date', appliedStartDate);
+            params.set('end_date', appliedEndDate);
+          }
+          const data = await requestJSON(`/api/chart_data?${params.toString()}`);
+          chart.setOption(chartOption(node, data));
+        } catch (error) {
+          showToast(error.message);
+        }
+      }
+    }
+
+    async function refreshAll() {
+      try {
+        const data = await requestJSON('/api/nodes');
+        renderNodeList(data.nodes);
+        await renderCharts(data.nodes);
+      } catch (error) {
+        showToast(error.message);
+      }
+    }
+
+    async function deleteNode(nodeId) {
+      try {
+        await requestJSON('/api/nodes/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ node_id: nodeId })
+        });
+        showToast('节点已删除');
+        await refreshAll();
+      } catch (error) {
+        showToast(error.message);
+      }
+    }
+
+    async function moveNode(nodeId, direction) {
+      try {
+        await requestJSON('/api/nodes/move', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ node_id: nodeId, direction })
+        });
+        await refreshAll();
+      } catch (error) {
+        showToast(error.message);
+      }
+    }
+
+    document.getElementById('addForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const formData = new FormData(event.target);
+      const payload = Object.fromEntries(formData.entries());
+
+      try {
+        await requestJSON('/api/nodes/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        event.target.reset();
+        showToast('节点已添加');
+        await refreshAll();
+      } catch (error) {
+        showToast(error.message);
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      charts.forEach(chart => chart.resize());
+    });
+
+    queryBtn.addEventListener('click', async () => {
+      if (!startDateInput.value || !endDateInput.value) {
+        showToast('请选择开始和结束日期');
+        return;
+      }
+
+      if (startDateInput.value > endDateInput.value) {
+        showToast('开始日期不能晚于结束日期');
+        return;
+      }
+
+      appliedStartDate = startDateInput.value;
+      appliedEndDate = endDateInput.value;
+      isRangeQueryApplied = true;
+      await refreshAll();
+    });
+
+    refreshAll();
+    window.setInterval(refreshAll, 30000);
+  </script>
+</body>
+</html>
