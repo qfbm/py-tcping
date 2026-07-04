@@ -19,6 +19,12 @@ python app.py
 python backend_monitor.py
 ```
 
+默认密码
+
+```powershell
+114514
+```
+
 ## 文件
 
 - `database.py`：SQLite 初始化与连接封装。
