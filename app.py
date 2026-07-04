@@ -6,6 +6,7 @@ from flask import Flask, jsonify, redirect, render_template, request, session, u
 
 from backend_monitor import MonitorManager
 from database import get_connection, init_db
+from time_utils import app_now, minute_floor
 
 
 app = Flask(__name__)
@@ -34,12 +35,8 @@ def normalize_node_order(conn):
         )
 
 
-def minute_floor(value):
-    return value.replace(second=0, microsecond=0)
-
-
 def current_minute_end():
-    return minute_floor(datetime.now()) + timedelta(minutes=1)
+    return minute_floor(app_now()) + timedelta(minutes=1)
 
 
 @app.before_request
