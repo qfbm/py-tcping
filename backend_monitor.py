@@ -1,13 +1,14 @@
 import socket
 import threading
 import time
+import os
 from dataclasses import dataclass
-from datetime import datetime
 
 from database import get_connection, init_db
+from time_utils import app_now
 
 
-TCP_TIMEOUT_SECONDS = 3
+TCP_TIMEOUT_SECONDS = float(os.environ.get("TCP_TIMEOUT_SECONDS", "1"))
 NODE_REFRESH_SECONDS = 2
 
 
@@ -30,7 +31,7 @@ class MinuteAggregator:
 
     @staticmethod
     def _current_minute():
-        return datetime.now().replace(second=0, microsecond=0)
+        return app_now().replace(second=0, microsecond=0)
 
     def add_result(self, ok, delay_ms=0.0):
         now_minute = self._current_minute()
