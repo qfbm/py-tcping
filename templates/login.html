@@ -5,6 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>登录 - TCPING Monitor</title>
   <style>
+    :root {
+      --bg: #eef4fb;
+      --panel: #ffffff;
+      --line: #d9e2ec;
+      --text: #172033;
+      --muted: #667085;
+      --blue: #2563eb;
+      --green: #22c55e;
+      --red: #ff4d4f;
+    }
+
     * {
       box-sizing: border-box;
     }
@@ -14,84 +25,200 @@
       min-height: 100vh;
       margin: 0;
       place-items: center;
-      background: #f4f7fb;
-      color: #1f2a37;
+      background:
+        radial-gradient(circle at 20% 12%, rgba(37, 99, 235, 0.12), transparent 28%),
+        radial-gradient(circle at 80% 10%, rgba(34, 197, 94, 0.12), transparent 24%),
+        var(--bg);
+      color: var(--text);
       font-family: "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+      padding: 24px;
     }
 
-    .login-card {
-      width: min(420px, calc(100vw - 32px));
-      padding: 28px;
-      border: 1px solid #d9e2ec;
+    .login-shell {
+      width: min(440px, 100%);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 44px;
+      height: 44px;
+      place-items: center;
       border-radius: 8px;
-      background: #ffffff;
-      box-shadow: 0 18px 50px rgba(15, 23, 42, 0.12);
+      background: #e8f0ff;
+      color: var(--blue);
+      font-size: 22px;
+      font-weight: 800;
     }
 
     h1 {
-      margin: 0 0 6px;
-      font-size: 24px;
+      margin: 0;
+      font-size: 26px;
+      line-height: 1.1;
     }
 
-    p {
-      margin: 0 0 24px;
-      color: #667085;
-      font-size: 14px;
+    .brand-subtitle {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .login-card {
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: 0 22px 70px rgba(15, 23, 42, 0.14);
+    }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+
+    .card-title {
+      margin: 0 0 4px;
+      font-size: 18px;
+      font-weight: 800;
+    }
+
+    .card-desc {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.13);
     }
 
     label {
       display: block;
       margin-bottom: 8px;
-      color: #667085;
+      color: var(--muted);
       font-size: 13px;
+      font-weight: 600;
     }
 
     input {
       width: 100%;
-      height: 42px;
+      height: 46px;
       border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      padding: 0 12px;
-      color: #1f2a37;
-      font-size: 15px;
+      border-radius: 7px;
+      background: #ffffff;
+      color: var(--text);
+      font-size: 16px;
       outline: none;
+      padding: 0 13px;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
 
     input:focus {
-      border-color: #2563eb;
+      border-color: var(--blue);
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
     }
 
     button {
       width: 100%;
-      height: 42px;
+      height: 46px;
       margin-top: 16px;
       border: 0;
-      border-radius: 6px;
-      background: #2563eb;
+      border-radius: 7px;
+      background: var(--blue);
       color: #ffffff;
       cursor: pointer;
       font-size: 15px;
-      font-weight: 700;
+      font-weight: 800;
+      box-shadow: 0 12px 24px rgba(37, 99, 235, 0.2);
+    }
+
+    button:active {
+      transform: translateY(1px);
     }
 
     .error {
+      min-height: 20px;
       margin-top: 12px;
-      color: #ff4d4f;
+      color: var(--red);
       font-size: 13px;
-      min-height: 18px;
+    }
+
+    .footnote {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+    }
+
+    @media (max-width: 520px) {
+      body {
+        padding: 16px;
+      }
+
+      .login-card {
+        padding: 22px;
+      }
+
+      .card-head {
+        align-items: flex-start;
+        flex-direction: column;
+      }
     }
   </style>
 </head>
 <body>
-  <main class="login-card">
-    <h1>TCPING Monitor</h1>
-    <p>请输入访问密码</p>
-    <form method="post">
-      <label for="password">密码</label>
-      <input id="password" name="password" type="password" autocomplete="current-password" autofocus required>
-      <button type="submit">进入</button>
-      <div class="error">{{ error }}</div>
-    </form>
+  <main class="login-shell">
+    <section class="brand">
+      <div class="brand-mark">T</div>
+      <div>
+        <h1>TCPING Monitor</h1>
+        <div class="brand-subtitle">Lightweight latency and packet loss dashboard</div>
+      </div>
+    </section>
+
+    <section class="login-card">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">安全访问</h2>
+          <p class="card-desc">输入访问密码后进入监控面板</p>
+        </div>
+        <div class="status">
+          <span class="status-dot"></span>
+          Protected
+        </div>
+      </div>
+
+      <form method="post">
+        <label for="password">访问密码</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" autofocus required>
+        <button type="submit">进入监控</button>
+        <div class="error">{{ error }}</div>
+      </form>
+    </section>
+
+    <div class="footnote">Session authentication enabled</div>
   </main>
 </body>
 </html>
