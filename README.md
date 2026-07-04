@@ -2,6 +2,21 @@
 
 一个轻量级 TCPING 监控系统，使用 Python、Flask、SQLite 和 ECharts。
 
+
+## Linux/Debian 建议
+
+```bash
+export PING_MONITOR_TZ=Asia/Shanghai
+export TCP_TIMEOUT_SECONDS=1
+python app.py
+```
+
+`PING_MONITOR_TZ` 用来固定应用聚合和查询使用的时区，避免服务器系统时区是 UTC 时图表日期错位。
+
+```powershell
+python backend_monitor.py
+```
+
 ## 运行
 
 ```powershell
