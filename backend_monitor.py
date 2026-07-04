@@ -4,12 +4,51 @@ import time
 import os
 from dataclasses import dataclass
 
-from database import get_connection, init_db
+from database import cleanup_old_logs, get_connection, init_db
 from time_utils import app_now
 
 
 TCP_TIMEOUT_SECONDS = float(os.environ.get("TCP_TIMEOUT_SECONDS", "1"))
 NODE_REFRESH_SECONDS = 2
+LOG_CLEANUP_SECONDS = 3600
+
+
+class PingLogBatchWriter:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.pending = {}
+
+    def enqueue(self, node_id, timestamp, avg_delay, loss_rate):
+        with self.lock:
+            self.pending[(node_id, timestamp)] = (
+                node_id,
+                timestamp,
+                round(avg_delay, 2),
+                round(loss_rate, 2),
+            )
+
+    def flush(self):
+        with self.lock:
+            if not self.pending:
+                return
+            rows = list(self.pending.values())
+            self.pending.clear()
+
+        with get_connection() as conn:
+            conn.executemany(
+                """
+                INSERT INTO ping_logs (node_id, timestamp, avg_delay, loss_rate)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(node_id, timestamp) DO UPDATE SET
+                    avg_delay = excluded.avg_delay,
+                    loss_rate = excluded.loss_rate
+                """,
+                rows,
+            )
+            conn.commit()
+
+
+ping_log_writer = PingLogBatchWriter()
 
 
 @dataclass(frozen=True)
@@ -56,19 +95,7 @@ class MinuteAggregator:
         avg_delay = self.total_delay / self.success_count if self.success_count else 0
         loss_rate = (self.failure_count / total) * 100
         timestamp = self.minute.strftime("%Y-%m-%d %H:%M:00")
-
-        with get_connection() as conn:
-            conn.execute(
-                """
-                INSERT INTO ping_logs (node_id, timestamp, avg_delay, loss_rate)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT(node_id, timestamp) DO UPDATE SET
-                    avg_delay = excluded.avg_delay,
-                    loss_rate = excluded.loss_rate
-                """,
-                (self.node_id, timestamp, round(avg_delay, 2), round(loss_rate, 2)),
-            )
-            conn.commit()
+        ping_log_writer.enqueue(self.node_id, timestamp, avg_delay, loss_rate)
 
 
 def tcping(host, port, timeout=TCP_TIMEOUT_SECONDS):
@@ -129,9 +156,11 @@ class MonitorManager:
         self.workers = {}
         self.worker_stop_events = {}
         self.lock = threading.Lock()
+        self.last_cleanup_at = 0
 
     def start(self):
         init_db()
+        cleanup_old_logs()
         if not self.supervisor_thread.is_alive():
             self.supervisor_thread.start()
 
@@ -145,6 +174,8 @@ class MonitorManager:
         for worker in workers:
             worker.join(timeout=5)
 
+        ping_log_writer.flush()
+
         if self.supervisor_thread.is_alive():
             self.supervisor_thread.join(timeout=5)
 
@@ -152,11 +183,21 @@ class MonitorManager:
         print("[monitor] supervisor started")
         while not self.stop_event.is_set():
             try:
+                self._cleanup_old_logs_if_needed()
                 self._sync_workers()
+                ping_log_writer.flush()
             except Exception as exc:
                 print(f"[monitor] supervisor error: {exc}")
             self.stop_event.wait(NODE_REFRESH_SECONDS)
         print("[monitor] supervisor stopped")
+
+    def _cleanup_old_logs_if_needed(self):
+        now = time.time()
+        if now - self.last_cleanup_at < LOG_CLEANUP_SECONDS:
+            return
+
+        cleanup_old_logs()
+        self.last_cleanup_at = now
 
     def _sync_workers(self):
         active_nodes = {node.id: node for node in fetch_active_nodes()}
