@@ -37,13 +37,16 @@
     .app {
       display: grid;
       grid-template-columns: 320px minmax(0, 1fr);
+      width: 100%;
       min-height: 100vh;
     }
 
     aside {
+      min-width: 0;
       border-right: 1px solid var(--line);
       background: #ffffff;
       padding: 22px;
+      overflow-x: hidden;
     }
 
     main {
@@ -165,7 +168,7 @@
     }
 
     .move-btn {
-      width: 30px;
+      width: 20px;
       height: 30px;
       border: 1px solid var(--line);
       background: #ffffff;
@@ -218,6 +221,15 @@
       background: var(--blue);
     }
 
+    .refresh-btn {
+      height: 38px;
+      min-width: 86px;
+      padding: 0 16px;
+      border: 1px solid var(--line);
+      background: #ffffff;
+      color: var(--text);
+    }
+
     .filter-text {
       display: none;
       color: var(--muted);
@@ -228,12 +240,17 @@
     .node-list {
       display: grid;
       gap: 10px;
+      min-width: 0;
+      max-width: 100%;
+      overflow-x: hidden;
     }
 
     .node-row {
       display: flex;
       align-items: center;
       gap: 10px;
+      min-width: 0;
+      max-width: 100%;
       padding: 10px;
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -383,6 +400,10 @@
         width: 100%;
       }
 
+      .refresh-btn {
+        width: 100%;
+      }
+
       .filter-text {
         text-align: left;
       }
@@ -451,6 +472,7 @@
             <input id="endDate" type="text" placeholder="选择结束日期" readonly>
           </div>
           <button id="queryBtn" class="query-btn" type="button">查询</button>
+          <button id="refreshBtn" class="refresh-btn" type="button">刷新</button>
         </div>
         <div id="filterText" class="filter-text"></div>
       </section>
@@ -468,6 +490,7 @@
     const startDateInput = document.getElementById('startDate');
     const endDateInput = document.getElementById('endDate');
     const queryBtn = document.getElementById('queryBtn');
+    const refreshBtn = document.getElementById('refreshBtn');
     const filterText = document.getElementById('filterText');
 
     function localDateString(date = new Date()) {
@@ -539,7 +562,7 @@
           </div>
         `;
         row.querySelector('.node-name').textContent = node.name;
-        row.querySelector('.node-host').textContent = `${node.host}:${node.port} / ${node.interval}s`;
+        row.querySelector('.node-host').textContent = `${node.host}:${node.port}`;
         row.querySelector('.move-up').disabled = index === 0;
         row.querySelector('.move-down').disabled = index === nodes.length - 1;
         row.querySelector('.move-up').addEventListener('click', () => moveNode(node.id, 'up'));
@@ -758,8 +781,9 @@
       await refreshAll();
     });
 
+    refreshBtn.addEventListener('click', refreshAll);
+
     refreshAll();
-    window.setInterval(refreshAll, 30000);
   </script>
 </body>
 </html>
