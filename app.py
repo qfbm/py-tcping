@@ -1,5 +1,6 @@
 import os
 import secrets
+import math
 from datetime import datetime, timedelta
 
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
@@ -12,6 +13,7 @@ from time_utils import app_now, minute_floor
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
 LOGIN_PASSWORD = os.environ.get("PING_MONITOR_PASSWORD", "114514")
+MAX_CHART_POINTS = 900
 monitor_manager = MonitorManager()
 
 
@@ -37,6 +39,58 @@ def normalize_node_order(conn):
 
 def current_minute_end():
     return minute_floor(app_now()) + timedelta(minutes=1)
+
+
+def chart_bucket_minutes(start_dt, end_dt):
+    total_minutes = max(1, math.ceil((end_dt - start_dt).total_seconds() / 60))
+    return max(1, math.ceil(total_minutes / MAX_CHART_POINTS))
+
+
+def fetch_chart_rows(conn, node_id, start_time, end_time, bucket_minutes):
+    if bucket_minutes <= 1:
+        return conn.execute(
+            """
+            SELECT timestamp, avg_delay, loss_rate
+            FROM ping_logs
+            WHERE node_id = ? AND timestamp >= ? AND timestamp < ?
+            ORDER BY timestamp ASC
+            LIMIT ?
+            """,
+            (node_id, start_time, end_time, MAX_CHART_POINTS),
+        ).fetchall()
+
+    bucket_seconds = bucket_minutes * 60
+    return conn.execute(
+        """
+        SELECT
+            MIN(timestamp) AS timestamp,
+            ROUND(AVG(avg_delay), 2) AS avg_delay,
+            ROUND(AVG(loss_rate), 2) AS loss_rate
+        FROM (
+            SELECT
+                timestamp,
+                avg_delay,
+                loss_rate,
+                CAST(
+                    (strftime('%s', timestamp) - strftime('%s', ?)) / ?
+                    AS INTEGER
+                ) AS bucket
+            FROM ping_logs
+            WHERE node_id = ? AND timestamp >= ? AND timestamp < ?
+        )
+        GROUP BY bucket
+        ORDER BY bucket ASC
+        LIMIT ?
+        """,
+        (
+            start_time,
+            bucket_seconds,
+            node_id,
+            start_time,
+            end_time,
+            MAX_CHART_POINTS,
+        ),
+    ).fetchall()
 
 
 @app.before_request
@@ -217,8 +271,7 @@ def api_chart_data():
     date_text = (request.args.get("date") or "").strip()
     start_date_text = (request.args.get("start_date") or "").strip()
     end_date_text = (request.args.get("end_date") or "").strip()
-    start_time = None
-    end_time = None
+    start_dt = None
     end_dt = None
     use_date_labels = False
 
@@ -232,9 +285,8 @@ def api_chart_data():
         if start_date > end_date:
             return jsonify({"ok": False, "error": "开始日期不能晚于结束日期"}), 400
 
+        start_dt = start_date
         end_dt = end_date + timedelta(days=1)
-        start_time = start_date.strftime("%Y-%m-%d 00:00:00")
-        end_time = end_dt.strftime("%Y-%m-%d 00:00:00")
         use_date_labels = start_date.date() != end_date.date()
     elif date_text:
         try:
@@ -242,33 +294,31 @@ def api_chart_data():
         except ValueError:
             return jsonify({"ok": False, "error": "日期格式必须是 YYYY-MM-DD"}), 400
 
+        start_dt = selected_date
         end_dt = selected_date + timedelta(days=1)
-        start_time = selected_date.strftime("%Y-%m-%d 00:00:00")
-        end_time = end_dt.strftime("%Y-%m-%d 00:00:00")
     else:
         end_dt = current_minute_end()
-        start_time = (end_dt - timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S")
-        end_time = end_dt.strftime("%Y-%m-%d %H:%M:%S")
+        start_dt = end_dt - timedelta(hours=2)
 
     now_end = current_minute_end()
     if end_dt > now_end:
         end_dt = now_end
-        end_time = end_dt.strftime("%Y-%m-%d %H:%M:%S")
 
-    with get_connection() as conn:
-        if start_time and end_time:
-            rows = conn.execute(
-                """
-                SELECT timestamp, avg_delay, loss_rate
-                FROM ping_logs
-                WHERE node_id = ? AND timestamp >= ? AND timestamp < ?
-                ORDER BY timestamp ASC
-                LIMIT 10000
-                """,
-                (node_id, start_time, end_time),
-            ).fetchall()
-        else:
-            rows = []
+    rows = []
+    bucket_minutes = 1
+    if start_dt < end_dt:
+        start_time = start_dt.strftime("%Y-%m-%d %H:%M:%S")
+        end_time = end_dt.strftime("%Y-%m-%d %H:%M:%S")
+        bucket_minutes = chart_bucket_minutes(start_dt, end_dt)
+
+        with get_connection() as conn:
+            rows = fetch_chart_rows(
+                conn,
+                node_id,
+                start_time,
+                end_time,
+                bucket_minutes,
+            )
 
     timestamps = [
         row["timestamp"][5:16] if use_date_labels else row["timestamp"][11:16]
@@ -283,6 +333,8 @@ def api_chart_data():
             "timestamps": timestamps,
             "avgDelay": avg_delay,
             "lossPk": loss_rate,
+            "bucketMinutes": bucket_minutes,
+            "sampled": bucket_minutes > 1,
         }
     )
 
@@ -290,4 +342,4 @@ def api_chart_data():
 if __name__ == "__main__":
     init_db()
     monitor_manager.start()
-    app.run(host="0.0.0.0", port=5000, debug=False, threaded=True, use_reloader=False)
+    app.run(host="0.0.0.0", port=18899, debug=False, threaded=True, use_reloader=False)
