@@ -318,6 +318,40 @@
       font-size: 12px;
     }
 
+    .chart-head-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .chart-reset-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 30px;
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .chart-reset-btn:hover:not(:disabled) {
+      border-color: var(--blue);
+      color: var(--blue);
+    }
+
+    .chart-reset-btn:disabled {
+      opacity: 0.38;
+      cursor: default;
+    }
+
     .chart {
       width: 100%;
       height: 304px;
@@ -598,6 +632,17 @@
         legend: {
           show: false
         },
+        toolbox: {
+          show: true,
+          top: -100,
+          left: -100,
+          feature: {
+            dataZoom: {
+              xAxisIndex: 0,
+              yAxisIndex: 'none'
+            }
+          }
+        },
         grid: {
           top: 42,
           left: 54,
@@ -617,6 +662,18 @@
           },
           splitLine: { show: false }
         },
+        dataZoom: [
+          {
+            type: 'inside',
+            xAxisIndex: 0,
+            filterMode: 'filter',
+            zoomOnMouseWheel: false,
+            moveOnMouseMove: false,
+            moveOnMouseWheel: false,
+            preventDefaultMouseMove: true,
+            throttle: 30
+          }
+        ],
         yAxis: [
           {
             type: 'value',
@@ -697,10 +754,32 @@
         card.innerHTML = `
           <div class="chart-head">
             <div class="chart-title"></div>
-            <div class="chart-subtitle"></div>
+            <div class="chart-head-actions">
+              <div class="chart-subtitle"></div>
+              <button class="chart-reset-btn" type="button" title="还原缩放" aria-label="还原缩放" disabled>↺</button>
+            </div>
           </div>
           <div class="chart"></div>
         `;
+        const resetButton = card.querySelector('.chart-reset-btn');
+        resetButton.addEventListener('click', () => {
+          const currentChart = charts.get(node.id);
+          if (!currentChart) {
+            return;
+          }
+          currentChart.dispatchAction({
+            type: 'dataZoom',
+            dataZoomIndex: 0,
+            start: 0,
+            end: 100
+          });
+          resetButton.disabled = true;
+          currentChart.dispatchAction({
+            type: 'takeGlobalCursor',
+            key: 'dataZoomSelect',
+            dataZoomSelectActive: true
+          });
+        });
         chartCards.set(node.id, card);
       }
 
@@ -710,6 +789,9 @@
 
       if (!chart) {
         chart = echarts.init(card.querySelector('.chart'));
+        chart.on('datazoom', () => {
+          card.querySelector('.chart-reset-btn').disabled = false;
+        });
         charts.set(node.id, chart);
       }
 
@@ -746,6 +828,12 @@
           chart.setOption(chartOption(node, data), {
             notMerge: true,
             lazyUpdate: false
+          });
+          chartCards.get(node.id).querySelector('.chart-reset-btn').disabled = true;
+          chart.dispatchAction({
+            type: 'takeGlobalCursor',
+            key: 'dataZoomSelect',
+            dataZoomSelectActive: true
           });
         } catch (error) {
           if (generation === refreshGeneration) {
