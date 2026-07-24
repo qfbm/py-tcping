@@ -484,6 +484,8 @@
 
   <script>
     const charts = new Map();
+    const chartCards = new Map();
+    const CHART_DRAW_DURATION = 1200;
     const chartRoot = document.getElementById('charts');
     const nodeList = document.getElementById('nodeList');
     const toast = document.getElementById('toast');
@@ -505,6 +507,7 @@
     let appliedStartDate = startDateInput.value;
     let appliedEndDate = endDateInput.value;
     let isRangeQueryApplied = false;
+    let refreshGeneration = 0;
 
     flatpickr(startDateInput, {
       locale: flatpickr.l10ns.zh,
@@ -574,10 +577,18 @@
 
     function chartOption(node, data) {
       const maxXAxisLabels = 8;
-      const xAxisLabelStep = Math.max(1, Math.ceil(data.timestamps.length / maxXAxisLabels) + 1);
+      const pointCount = data.timestamps.length;
+      const isLargeData = pointCount > 500;
+      const xAxisLabelStep = Math.max(1, Math.ceil(Math.max(pointCount, 1) / maxXAxisLabels));
 
       return {
         backgroundColor: 'transparent',
+        animation: true,
+        animationDuration: CHART_DRAW_DURATION,
+        animationDurationUpdate: 0,
+        animationEasing: 'linear',
+        animationEasingUpdate: 'linear',
+        animationThreshold: 5000,
         tooltip: {
           trigger: 'axis',
           backgroundColor: '#ffffff',
@@ -638,42 +649,50 @@
             name: '延迟',
             data: data.avgDelay,
             type: 'line',
-            smooth: true,
+            smooth: !isLargeData,
+            sampling: isLargeData ? 'lttb' : undefined,
             showSymbol: false,
             yAxisIndex: 0,
             z: 1,
             lineStyle: { width: 2, color: '#22c55e' },
             itemStyle: { color: '#22c55e' },
-            areaStyle: { color: 'rgba(34, 197, 94, 0.18)' }
+            areaStyle: { color: 'rgba(34, 197, 94, 0.16)' }
           },
           {
             name: '丢包率',
             data: data.lossPk,
             type: 'line',
-            smooth: true,
+            smooth: !isLargeData,
+            sampling: isLargeData ? 'lttb' : undefined,
             showSymbol: false,
             yAxisIndex: 1,
             z: 2,
             lineStyle: { width: 2, color: '#ff4d4f' },
             itemStyle: { color: '#ff4d4f' },
-            areaStyle: { color: 'rgba(255, 77, 79, 0.2)' }
+            areaStyle: { color: 'rgba(255, 77, 79, 0.16)' }
           }
         ]
       };
     }
 
-    async function renderCharts(nodes) {
-      chartRoot.innerHTML = '';
-      charts.forEach(chart => chart.dispose());
-      charts.clear();
+    function removeStaleCharts(nodes) {
+      const activeIds = new Set(nodes.map(node => node.id));
+      charts.forEach((chart, nodeId) => {
+        if (!activeIds.has(nodeId)) {
+          chart.dispose();
+          charts.delete(nodeId);
+          chartCards.get(nodeId)?.remove();
+          chartCards.delete(nodeId);
+        }
+      });
+    }
 
-      if (!nodes.length) {
-        chartRoot.innerHTML = '<div class="empty">添加一个节点后，图表会在下一分钟聚合写入后显示数据。</div>';
-        return;
-      }
+    function ensureChart(node) {
+      let card = chartCards.get(node.id);
+      let chart = charts.get(node.id);
 
-      for (const node of nodes) {
-        const card = document.createElement('section');
+      if (!card) {
+        card = document.createElement('section');
         card.className = 'chart-card';
         card.innerHTML = `
           <div class="chart-head">
@@ -682,13 +701,35 @@
           </div>
           <div class="chart"></div>
         `;
-        card.querySelector('.chart-title').textContent = node.name;
-        card.querySelector('.chart-subtitle').textContent = `${node.host}:${node.port}`;
-        chartRoot.appendChild(card);
+        chartCards.set(node.id, card);
+      }
 
-        const chartEl = card.querySelector('.chart');
-        const chart = echarts.init(chartEl);
+      card.querySelector('.chart-title').textContent = node.name;
+      card.querySelector('.chart-subtitle').textContent = `${node.host}:${node.port}`;
+      chartRoot.appendChild(card);
+
+      if (!chart) {
+        chart = echarts.init(card.querySelector('.chart'));
         charts.set(node.id, chart);
+      }
+
+      return chart;
+    }
+
+    async function renderCharts(nodes, generation) {
+      removeStaleCharts(nodes);
+
+      if (!nodes.length) {
+        chartRoot.innerHTML = '<div class="empty">添加一个节点后，图表会在下一分钟聚合写入后显示数据。</div>';
+        return;
+      }
+
+      chartRoot.querySelector(':scope > .empty')?.remove();
+
+      const loadChart = async (node) => {
+        const chart = ensureChart(node);
+        chart.resize();
+        chart.clear();
 
         try {
           const params = new URLSearchParams({ node_id: node.id });
@@ -697,20 +738,38 @@
             params.set('end_date', appliedEndDate);
           }
           const data = await requestJSON(`/api/chart_data?${params.toString()}`);
-          chart.setOption(chartOption(node, data));
+          if (generation !== refreshGeneration) {
+            return;
+          }
+
+          chart.clear();
+          chart.setOption(chartOption(node, data), {
+            notMerge: true,
+            lazyUpdate: false
+          });
         } catch (error) {
-          showToast(error.message);
+          if (generation === refreshGeneration) {
+            showToast(error.message);
+          }
         }
-      }
+      };
+
+      await Promise.all(nodes.map(loadChart));
     }
 
     async function refreshAll() {
+      const generation = ++refreshGeneration;
       try {
         const data = await requestJSON('/api/nodes');
+        if (generation !== refreshGeneration) {
+          return;
+        }
         renderNodeList(data.nodes);
-        await renderCharts(data.nodes);
+        await renderCharts(data.nodes, generation);
       } catch (error) {
-        showToast(error.message);
+        if (generation === refreshGeneration) {
+          showToast(error.message);
+        }
       }
     }
 
