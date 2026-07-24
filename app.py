@@ -298,7 +298,8 @@ def api_chart_data():
         end_dt = selected_date + timedelta(days=1)
     else:
         end_dt = current_minute_end()
-        start_dt = end_dt - timedelta(hours=2)
+        start_dt = end_dt - timedelta(hours=24)
+        use_date_labels = True
 
     now_end = current_minute_end()
     if end_dt > now_end:
