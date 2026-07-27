@@ -214,6 +214,37 @@ def api_nodes_delete():
     return jsonify({"ok": True})
 
 
+@app.post("/api/nodes/rename")
+def api_nodes_rename():
+    data = request.get_json(silent=True) or request.form
+    try:
+        node_id = int(data.get("node_id", 0))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "node_id 无效"}), 400
+
+    name = (data.get("name") or "").strip()
+    if node_id <= 0:
+        return jsonify({"ok": False, "error": "node_id 无效"}), 400
+    if not name:
+        return jsonify({"ok": False, "error": "节点名称不能为空"}), 400
+
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE nodes
+            SET name = ?
+            WHERE id = ? AND is_active = 1
+            """,
+            (name, node_id),
+        )
+        conn.commit()
+
+    if cursor.rowcount == 0:
+        return jsonify({"ok": False, "error": "节点不存在"}), 404
+
+    return jsonify({"ok": True, "name": name})
+
+
 @app.post("/api/nodes/move")
 def api_nodes_move():
     data = request.get_json(silent=True) or request.form
